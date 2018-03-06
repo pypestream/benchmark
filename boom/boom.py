@@ -233,7 +233,6 @@ def run(
 
     try:
         if num is not None:
-            print(num)
             jobs = [pool.spawn(onecall, method,
                     maybe_append_query_string(url, query, query_params[i] if query else None),
                     res, **options)
