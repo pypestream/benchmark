@@ -21,6 +21,7 @@ from requests.packages.urllib3.util import parse_url
 from socket import gethostbyname, gaierror
 
 from boom import __version__
+from boom.functions import get_uuid_list, maybe_append_query_string
 from boom.util import resolve_name
 from boom.pgbar import AnimatedProgressBar
 
@@ -198,7 +199,7 @@ def onecall(method, url, results, **options):
 def run(
     url, num=1, duration=None, method='GET', data=None, ct='text/plain',
         auth=None, concurrency=1, headers=None, pre_hook=None, post_hook=None,
-        quiet=False):
+        quiet=False, query=None, query_params=None):
 
     if headers is None:
         headers = {}
@@ -232,7 +233,10 @@ def run(
 
     try:
         if num is not None:
-            jobs = [pool.spawn(onecall, method, url, res, **options)
+            print(num)
+            jobs = [pool.spawn(onecall, method,
+                    maybe_append_query_string(url, query, query_params[i] if query else None),
+                    res, **options)
                     for i in range(num)]
             pool.join()
         else:
@@ -281,7 +285,8 @@ def resolve(url):
 
 
 def load(url, requests, concurrency, duration, method, data, ct, auth,
-         headers=None, pre_hook=None, post_hook=None, quiet=False):
+         headers=None, pre_hook=None, post_hook=None, quiet=False, query=None,
+         query_params=None):
     if not quiet:
         print_server_info(url, method, headers=headers)
 
@@ -296,7 +301,8 @@ def load(url, requests, concurrency, duration, method, data, ct, auth,
     try:
         return run(url, requests, duration, method,
                    data, ct, auth, concurrency, headers,
-                   pre_hook, post_hook, quiet=quiet)
+                   pre_hook, post_hook, quiet=quiet,
+                   query=query, query_params=query_params)
     finally:
         if not quiet:
             print(' Done')
@@ -335,7 +341,7 @@ def main():
                               "to a callable which will be executed before "
                               "doing a request for example: "
                               "pre_hook(method, url, options). "
-                              "It must return a tupple of parameters given in "
+                              "It must return a tuple of parameters given in "
                               "function definition"),
                         type=str)
 
@@ -365,6 +371,10 @@ def main():
     group.add_argument('-d', '--duration', help='Duration in seconds',
                        type=int)
 
+    parser.add_argument('-r', '--random', help=('A query parameter to randomize when '
+                                                'sending the request'),
+                        type=str)
+
     parser.add_argument('url', help='URL to hit', nargs='?')
     args = parser.parse_args()
 
@@ -384,6 +394,11 @@ def main():
 
     if args.requests is None and args.duration is None:
         args.requests = 1
+
+    if args.random is not None:
+        query_list = get_uuid_list(args.requests, 10)
+    else:
+        query_list = []
 
     try:
         url, original, resolved = resolve(args.url)
@@ -415,7 +430,8 @@ def main():
             url, args.requests, args.concurrency, args.duration,
             args.method, args.data, args.content_type, args.auth,
             headers=headers, pre_hook=args.pre_hook,
-            post_hook=args.post_hook, quiet=(args.json_output or args.quiet))
+            post_hook=args.post_hook, quiet=(args.json_output or args.quiet),
+            query=args.random, query_params=query_list)
     except RequestException as e:
         print_errors((e, ))
         sys.exit(1)

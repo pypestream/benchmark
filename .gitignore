@@ -1,7 +1,9 @@
 *.pyc
+*.swp
 .tox/
 boom.egg-info/
 venv/
+build/
 dist/
 .idea/
 .coverage
